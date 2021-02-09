@@ -1,5 +1,10 @@
 package cn.author.ws3.service;
 
+import cn.author.ws3.entity.MessageBody;
+import com.alibaba.fastjson.JSON;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.websocket.*;
@@ -15,22 +20,29 @@ public class WebSocketServer {
     //静态变量，用来记录当前在线连接数。应该把它设计成线程安全的。
     private static AtomicInteger onlineNum = new AtomicInteger();
 
+    protected static final Logger log = LoggerFactory.getLogger(WebSocketServer.class);
     //concurrent包的线程安全Set，用来存放每个客户端对应的WebSocketServer对象。
     private static ConcurrentHashMap<String, Session> sessionPools = new ConcurrentHashMap<>();
 
     //发送消息
     public void sendMessage(Session session, String message) throws IOException {
-        if(session != null){
-            synchronized (session) {
+        try {
+            if(session != null){
+                synchronized (session) {
 //                System.out.println("发送数据：" + message);
-                session.getBasicRemote().sendText(message);
+                    session.getBasicRemote().sendText(message);
+                }
+            }else {
+                log.info("用户未登录");
             }
+        }catch ( Exception e){
+            log.error("发送消息出错:",e);
         }
     }
     //给指定用户发送信息
     public void sendInfo(String userName, String message){
-        Session session = sessionPools.get(userName);
         try {
+            Session session = sessionPools.get(userName);
             sendMessage(session, message);
         }catch (Exception e){
             e.printStackTrace();
@@ -40,10 +52,10 @@ public class WebSocketServer {
     //建立连接成功调用
     @OnOpen
     public void onOpen(Session session, @PathParam(value = "sid") String userName){
-        sessionPools.put(userName, session);
-        addOnlineCount();
-        System.out.println(userName + "加入webSocket！当前人数为" + onlineNum);
         try {
+            sessionPools.put(userName, session);
+            addOnlineCount();
+            System.out.println(userName + "加入webSocket！当前人数为" + onlineNum);
             sendMessage(session, "欢迎" + userName + "加入连接！");
         } catch (IOException e) {
             e.printStackTrace();
@@ -61,16 +73,20 @@ public class WebSocketServer {
     //收到客户端信息
     @OnMessage
     public void onMessage(String message) throws IOException{
-        message = "客户端：" + message + ",已收到";
-        System.out.println(message);
-        for (Session session: sessionPools.values()) {
-            try {
-                sendMessage(session, message);
-            } catch(Exception e){
-                e.printStackTrace();
-                continue;
+        try{
+            if(StringUtils.isBlank(message.trim())){return;}
+            System.out.println(message);
+            MessageBody msg = JSON.parseObject(message, MessageBody.class);
+            if(null==msg||null==msg.getFrom()||null==msg.getTo()||null==msg.getMessage()){
+                log.info("消息信息不完整:"+message);
+                return;
             }
+            sendMessage(sessionPools.get(msg.getTo()),msg.getMessage());
+        }catch (Exception e){
+            log.error("发送消息出错:",e);
+
         }
+
     }
 
     //错误时调用
