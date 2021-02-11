@@ -1,5 +1,7 @@
 package cn.author.ws3.entity;
 
+import java.util.Date;
+
 public class MessageBody {
     private String message;
 
@@ -8,6 +10,8 @@ public class MessageBody {
     private String to;
 
     private String token;
+
+    private Date date;
 
 
     public String getToken() {
@@ -40,5 +44,13 @@ public class MessageBody {
 
     public void setTo(String to) {
         this.to = to;
+    }
+
+    public Date getDate() {
+        return date;
+    }
+
+    public void setDate(Date date) {
+        this.date = date;
     }
 }

@@ -11,10 +11,11 @@ import javax.websocket.*;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
+import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@ServerEndpoint("/webSocket/{sid}")
+@ServerEndpoint("/webSocket/{uid}")
 @Component
 public class WebSocketServer {
     //静态变量，用来记录当前在线连接数。应该把它设计成线程安全的。
@@ -25,12 +26,11 @@ public class WebSocketServer {
     private static ConcurrentHashMap<String, Session> sessionPools = new ConcurrentHashMap<>();
 
     //发送消息
-    public void sendMessage(Session session, String message) throws IOException {
+    public void sendMessage(Session session, MessageBody messageBody) throws IOException {
         try {
             if(session != null){
                 synchronized (session) {
-//                System.out.println("发送数据：" + message);
-                    session.getBasicRemote().sendText(message);
+                    session.getBasicRemote().sendText(JSON.toJSONString(messageBody));
                 }
             }else {
                 log.info("用户未登录");
@@ -39,32 +39,22 @@ public class WebSocketServer {
             log.error("发送消息出错:",e);
         }
     }
-    //给指定用户发送信息
-    public void sendInfo(String userName, String message){
-        try {
-            Session session = sessionPools.get(userName);
-            sendMessage(session, message);
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-    }
 
     //建立连接成功调用
     @OnOpen
-    public void onOpen(Session session, @PathParam(value = "sid") String userName){
+    public void onOpen(Session session, @PathParam(value = "uid") String userName){
         try {
             sessionPools.put(userName, session);
             addOnlineCount();
             System.out.println(userName + "加入webSocket！当前人数为" + onlineNum);
-            sendMessage(session, "欢迎" + userName + "加入连接！");
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     //关闭连接时调用
     @OnClose
-    public void onClose(@PathParam(value = "sid") String userName){
+    public void onClose(@PathParam(value = "uid") String userName){
         sessionPools.remove(userName);
         subOnlineCount();
         System.out.println(userName + "断开webSocket连接！当前人数为" + onlineNum);
@@ -77,11 +67,12 @@ public class WebSocketServer {
             if(StringUtils.isBlank(message.trim())){return;}
             System.out.println(message);
             MessageBody msg = JSON.parseObject(message, MessageBody.class);
+            msg.setDate(new Date());
             if(null==msg||null==msg.getFrom()||null==msg.getTo()||null==msg.getMessage()){
                 log.info("消息信息不完整:"+message);
                 return;
             }
-            sendMessage(sessionPools.get(msg.getTo()),msg.getMessage());
+            sendMessage(sessionPools.get(msg.getTo()),msg);
         }catch (Exception e){
             log.error("发送消息出错:",e);
 
