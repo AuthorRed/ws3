@@ -44,8 +44,10 @@ public class WebSocketServer {
     @OnOpen
     public void onOpen(Session session, @PathParam(value = "uid") String userName){
         try {
-            sessionPools.put(userName, session);
-            addOnlineCount();
+            Session previous = sessionPools.put(userName, session);
+            if(null==previous){
+                addOnlineCount();
+            }
             System.out.println(userName + "加入webSocket！当前人数为" + onlineNum);
         } catch (Exception e) {
             e.printStackTrace();
